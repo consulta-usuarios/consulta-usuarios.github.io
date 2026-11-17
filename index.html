@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Consulta de usuarios</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --text: #1b1f27;
+    --muted: #5d6573;
+    --line: #e2e5ea;
+    --accent: #1f4fbf;
+    --accent-soft: #e8eefc;
+    --danger: #b3261e;
+    --ok: #1e7a46;
+    --radius: 12px;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b;
+      --panel: #1b1f27;
+      --text: #e8ebf0;
+      --muted: #9aa3b2;
+      --line: #2c323d;
+      --accent: #7ea2ff;
+      --accent-soft: #1f2a44;
+      --danger: #ff8a80;
+      --ok: #6fd39a;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 960px; margin: 0 auto; padding: 32px 16px 48px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); margin: 0 0 24px; font-size: .95rem; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .tabs { display: flex; gap: 4px; background: var(--bg); padding: 4px; border-radius: 10px; margin-bottom: 18px; width: fit-content; }
+  .tabs button {
+    border: 0; background: transparent; color: var(--muted);
+    padding: 8px 16px; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  form { display: grid; gap: 12px; }
+  .campos { display: grid; gap: 12px; grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 680px) { .campos { grid-template-columns: 1fr; } }
+  label { display: grid; gap: 4px; font-size: .85rem; font-weight: 600; color: var(--muted); }
+  input {
+    font: inherit; font-size: 1rem; color: var(--text); background: var(--panel);
+    border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; width: 100%;
+    text-transform: uppercase;
+  }
+  input::placeholder { text-transform: none; color: var(--muted); opacity: .7; }
+  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+  .acciones { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  button.principal {
+    font: inherit; font-weight: 600; border: 0; border-radius: 8px; padding: 10px 20px;
+    background: var(--accent); color: #fff; cursor: pointer;
+  }
+  @media (prefers-color-scheme: dark) { button.principal { color: #0d1220; } }
+  button.principal:disabled { opacity: .6; cursor: progress; }
+  .ayuda { color: var(--muted); font-size: .85rem; }
+  .fila-ced { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+  .fila-ced label { flex: 1 1 260px; }
+
+  #estado { margin: 20px 0 8px; color: var(--muted); min-height: 1.5em; }
+  #estado.error { color: var(--danger); }
+
+  .ficha { display: grid; gap: 16px; grid-template-columns: auto 1fr; align-items: start; }
+  @media (max-width: 680px) { .ficha { grid-template-columns: 1fr; } }
+  .ficha dt { color: var(--muted); font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  .ficha dd { margin: 2px 0 0; font-size: 1.15rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .ficha div:first-child { padding-right: 32px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; font-weight: 600; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; width: 1%; padding-right: 32px; }
+  .resultados { padding: 0; overflow: hidden; }
+  .mas { padding: 14px; text-align: center; }
+  .mas button { font: inherit; background: var(--accent-soft); color: var(--accent); border: 0; border-radius: 8px; padding: 8px 16px; font-weight: 600; cursor: pointer; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Consulta de usuarios</h1>
+  <p class="sub" id="sub">Cargando índice…</p>
+
+  <section class="card">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-ced" aria-selected="true" aria-controls="form-ced">Por cédula</button>
+      <button role="tab" id="tab-nom" aria-selected="false" aria-controls="form-nom">Por nombre</button>
+    </div>
+
+    <form id="form-ced" autocomplete="off">
+      <div class="fila-ced">
+        <label>Número de cédula
+          <input id="ced" inputmode="numeric" placeholder="Ej. 101370377" maxlength="14">
+        </label>
+        <button class="principal" type="submit">Consultar</button>
+      </div>
+    </form>
+
+    <form id="form-nom" autocomplete="off" hidden>
+      <div class="campos">
+        <label>Nombre<input id="nom" placeholder="Ej. María José"></label>
+        <label>Primer apellido<input id="ap1" placeholder="Ej. Rodríguez"></label>
+        <label>Segundo apellido<input id="ap2" placeholder="Ej. Mora"></label>
+      </div>
+      <div class="acciones">
+        <button class="principal" type="submit">Buscar</button>
+        <span class="ayuda">Llene uno o más campos. Los apellidos deben ir completos; el nombre puede ir solo al inicio (“MARIA” encuentra “MARIA JOSEFA”). No importan tildes ni mayúsculas.</span>
+      </div>
+    </form>
+  </section>
+
+  <p id="estado" role="status" aria-live="polite"></p>
+  <section id="salida"></section>
+</main>
+
+<script>
+"use strict";
+const DATOS = "data/";
+const MAX_BLOQUES = 60;      // límite de bloques a descargar en una búsqueda (~3 MB)
+const POR_PAGINA = 100;
+
+const $ = (id) => document.getElementById(id);
+let indice = null;
+const cacheBloques = new Map();
+
+/* ---------- utilidades ---------- */
+
+// Debe coincidir EXACTAMENTE con normalizar() en scripts/construir_datos.py
+function normalizar(s) {
+  if (/^[A-Z0-9 ]*$/.test(s)) return s;
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase()
+    .replace(/['.´`]/g, "").replace(/[^A-Z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ").trim();
+}
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function formatoCedula(c) { return c; }  // sin guiones, ej. 101370377
+
+const nombreCompleto = (r) => `${r.nom} ${r.a1} ${r.a2}`.trim();
+
+function estado(texto, error = false) {
+  const e = $("estado");
+  e.textContent = texto;
+  e.className = error ? "error" : "";
+}
+
+/* ---------- acceso a los datos ---------- */
+
+async function cargarIndice() {
+  const r = await fetch(DATOS + "indice.json");
+  if (!r.ok) throw new Error("No se encontró data/indice.json. ¿Ejecutó scripts/construir_datos.py?");
+  indice = await r.json();
+  const n = indice.total.toLocaleString("es-CR");
+  $("sub").textContent = `${n} registros` + (indice.corte ? ` · Datos con corte a ${indice.corte}` : "");
+}
+
+async function bloque(idx, n) {
+  const k = idx + "/" + n;
+  if (!cacheBloques.has(k)) {
+    const p = (async () => {
+      const r = await fetch(`${DATOS}${idx}/${n}.gz`);
+      if (!r.ok) throw new Error(`No se pudo descargar ${k} (${r.status})`);
+      const buf = await r.arrayBuffer();
+      const b = new Uint8Array(buf);
+      let texto;
+      if (b[0] === 0x1f && b[1] === 0x8b) {
+        // Comprimido: lo descomprimimos aquí (algunos servidores ya lo descomprimen solos)
+        const s = new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"));
+        texto = await new Response(s).text();
+      } else {
+        texto = new TextDecoder().decode(buf);
+      }
+      return texto.split("\n").filter(Boolean).map((l) => {
+        const [ced, nom, a1, a2] = l.split("|");
+        return { ced, nom, a1, a2 };
+      });
+    })();
+    cacheBloques.set(k, p);
+    p.catch(() => cacheBloques.delete(k));
+  }
+  return cacheBloques.get(k);
+}
+
+// Mayor i tal que claves[i] <= p (o -1)
+function ultimoMenorIgual(claves, p) {
+  let lo = 0, hi = claves.length - 1, r = -1;
+  while (lo <= hi) {
+    const m = (lo + hi) >> 1;
+    if (claves[m] <= p) { r = m; lo = m + 1; } else hi = m - 1;
+  }
+  return r;
+}
+
+// Bloques que pueden contener claves que empiezan con el prefijo p
+function rango(claves, p) {
+  const ini = Math.max(0, ultimoMenorIgual(claves, p));
+  const fin = Math.max(ini, ultimoMenorIgual(claves, p + "￿"));
+  const r = [];
+  for (let i = ini; i <= fin; i++) r.push(i);
+  return r;
+}
+
+async function descargar(idx, numeros, alAvanzar) {
+  let hechos = 0;
+  const salida = new Array(numeros.length);
+  let sig = 0;
+  async function trabajador() {
+    while (sig < numeros.length) {
+      const i = sig++;
+      salida[i] = await bloque(idx, numeros[i]);
+      alAvanzar(++hechos, numeros.length);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(6, numeros.length) }, trabajador));
+  return salida.flat();
+}
+
+/* ---------- búsquedas ---------- */
+
+function limpiarCedula(txt) {
+  const t = txt.trim();
+  const partes = t.split(/[\s-]+/).filter(Boolean);
+  if (partes.length === 3 && partes.every((x) => /^\d+$/.test(x)) && partes[0].length === 1
+      && partes[1].length <= 4 && partes[2].length <= 4) {
+    return partes[0] + partes[1].padStart(4, "0") + partes[2].padStart(4, "0");
+  }
+  return t.replace(/\D/g, "");
+}
+
+async function buscarCedula(entrada) {
+  const ced = limpiarCedula(entrada);
+  if (ced.length !== 9) {
+    estado("La cédula debe tener 9 dígitos (ej. 1-0137-0377).", true);
+    $("salida").innerHTML = "";
+    return;
+  }
+  estado("Buscando…");
+  const claves = indice.indices.ced;
+  const n = Math.max(0, ultimoMenorIgual(claves, ced));
+  const regs = await bloque("ced", n);
+  const r = regs.find((x) => x.ced === ced);
+  if (!r) {
+    estado(`No se encontró la cédula ${formatoCedula(ced)}.`, true);
+    $("salida").innerHTML = "";
+    return;
+  }
+  estado("");
+  mostrarFicha(r);
+}
+
+function planes(n, a, b) {
+  const p = [];
+  if (a) p.push({ idx: "ap1", prefijos: [a + "|" + (b ? b + "|" + n : "")] });
+  if (b) p.push({ idx: "ap2", prefijos: [b + "|" + (a ? a + "|" + n : "")] });
+  if (n) p.push({ idx: "nom", prefijos: [n + "|" + (a ? a + "|" + (b ? b + "|" : "") : ""), n + " "] });
+  for (const x of p) {
+    const s = new Set();
+    for (const pre of x.prefijos) rango(indice.indices[x.idx], pre).forEach((i) => s.add(i));
+    x.bloques = [...s].sort((i, j) => i - j);
+  }
+  return p.sort((x, y) => x.bloques.length - y.bloques.length);
+}
+
+let resultados = [], mostrados = 0;
+
+async function buscarNombre(nomTxt, a1Txt, a2Txt) {
+  const n = normalizar(nomTxt), a = normalizar(a1Txt), b = normalizar(a2Txt);
+  if (!n && !a && !b) { estado("Escriba al menos un nombre o apellido.", true); return; }
+  const plan = planes(n, a, b)[0];
+  if (plan.bloques.length > MAX_BLOQUES) {
+    estado("La búsqueda es demasiado amplia. Agregue otro dato (por ejemplo el segundo apellido o un nombre más completo).", true);
+    $("salida").innerHTML = "";
+    return;
+  }
+  estado("Buscando…");
+  const regs = await descargar(plan.idx, plan.bloques, (h, t) => {
+    if (t > 3) estado(`Buscando… (${Math.round((h / t) * 100)} %)`);
+  });
+  resultados = regs.filter((r) => {
+    if (a && normalizar(r.a1) !== a) return false;
+    if (b && normalizar(r.a2) !== b) return false;
+    if (n) { const k = normalizar(r.nom); if (k !== n && !k.startsWith(n + " ")) return false; }
+    return true;
+  });
+  resultados.sort((x, y) => (x.a1 + "|" + x.a2 + "|" + x.nom).localeCompare(y.a1 + "|" + y.a2 + "|" + y.nom, "es"));
+  if (!resultados.length) { estado("No se encontraron personas con esos datos.", true); $("salida").innerHTML = ""; return; }
+  if (resultados.length === 1) { estado("1 resultado"); mostrarFicha(resultados[0]); return; }
+  estado(`${resultados.length.toLocaleString("es-CR")} resultados`);
+  mostrados = 0;
+  $("salida").innerHTML = `<div class="card resultados"><table>
+    <thead><tr><th>Cédula</th><th>Nombre completo</th></tr></thead>
+    <tbody id="filas"></tbody></table><div class="mas" id="mas" hidden><button type="button">Mostrar más</button></div></div>`;
+  $("mas").firstElementChild.onclick = mostrarMas;
+  mostrarMas();
+}
+
+function mostrarMas() {
+  const tb = $("filas");
+  const hasta = Math.min(resultados.length, mostrados + POR_PAGINA);
+  let html = "";
+  for (let i = mostrados; i < hasta; i++) {
+    const r = resultados[i];
+    html += `<tr><td class="num">${formatoCedula(r.ced)}</td><td>${esc(nombreCompleto(r))}</td></tr>`;
+  }
+  tb.insertAdjacentHTML("beforeend", html);
+  mostrados = hasta;
+  $("mas").hidden = mostrados >= resultados.length;
+  $("mas").firstElementChild.textContent = `Mostrar más (${(resultados.length - mostrados).toLocaleString("es-CR")} restantes)`;
+}
+
+function mostrarFicha(r) {
+  $("salida").innerHTML = `<dl class="card ficha">
+    <div><dt>Cédula</dt><dd>${formatoCedula(r.ced)}</dd></div>
+    <div><dt>Nombre completo</dt><dd>${esc(nombreCompleto(r))}</dd></div>
+  </dl>`;
+}
+
+/* ---------- interfaz ---------- */
+
+function pestana(cual) {
+  const ced = cual === "ced";
+  $("tab-ced").setAttribute("aria-selected", ced);
+  $("tab-nom").setAttribute("aria-selected", !ced);
+  $("form-ced").hidden = !ced;
+  $("form-nom").hidden = ced;
+}
+
+// La búsqueda queda en la dirección (#...) para poder compartirla y usar "atrás"
+function ejecutarDesdeHash() {
+  const q = new URLSearchParams(location.hash.slice(1));
+  const tarea = q.has("ced")
+    ? (pestana("ced"), $("ced").value = q.get("ced"), buscarCedula(q.get("ced")))
+    : (q.has("nom") || q.has("ap1") || q.has("ap2"))
+      ? (pestana("nom"), $("nom").value = q.get("nom") || "", $("ap1").value = q.get("ap1") || "",
+         $("ap2").value = q.get("ap2") || "", buscarNombre($("nom").value, $("ap1").value, $("ap2").value))
+      : null;
+  if (!tarea) { $("salida").innerHTML = ""; estado(""); return; }
+  document.querySelectorAll("button.principal").forEach((b) => b.disabled = true);
+  tarea.catch((e) => estado("Error: " + e.message, true))
+    .finally(() => document.querySelectorAll("button.principal").forEach((b) => b.disabled = false));
+}
+
+function irA(params) {
+  const h = "#" + new URLSearchParams(params).toString();
+  if (location.hash === h) ejecutarDesdeHash(); else location.hash = h;
+}
+
+$("tab-ced").onclick = () => { pestana("ced"); $("ced").focus(); };
+$("tab-nom").onclick = () => { pestana("nom"); $("nom").focus(); };
+$("form-ced").onsubmit = (e) => { e.preventDefault(); irA({ ced: $("ced").value.trim() }); };
+$("form-nom").onsubmit = (e) => {
+  e.preventDefault();
+  const p = {};
+  for (const k of ["nom", "ap1", "ap2"]) if ($(k).value.trim()) p[k] = $(k).value.trim();
+  irA(p);
+};
+window.addEventListener("hashchange", ejecutarDesdeHash);
+
+if (typeof DecompressionStream === "undefined") {
+  $("sub").textContent = "";
+  estado("Su navegador es muy antiguo para esta página. Actualícelo a una versión reciente.", true);
+} else {
+  cargarIndice().then(ejecutarDesdeHash).catch((e) => { $("sub").textContent = ""; estado(e.message, true); });
+  $("ced").focus();
+}
+</script>
+</body>
+</html>
